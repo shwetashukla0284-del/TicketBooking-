@@ -6,7 +6,7 @@ The system is specifically engineered for high-concurrency booking scenarios (su
 
 ---
 
-## 🌟 Key Features
+##  Key Features
 
 ### 1. Interactive Visual Seat Map
 - Color-coded seat state grid (`AVAILABLE`, `SELECTED`, `HELD`, `BOOKED`).
@@ -36,7 +36,7 @@ The system is specifically engineered for high-concurrency booking scenarios (su
 
 ---
 
-## 🚀 Quick Start & Installation
+##  Quick Start & Installation
 
 ### Prerequisites
 - **Node.js**: v18.x or later
@@ -78,7 +78,7 @@ The system is specifically engineered for high-concurrency booking scenarios (su
 
 ---
 
-## 🔑 Demo Account Credentials
+##  Demo Account Credentials
 
 | Role | Email | Password | Access Privileges |
 |---|---|---|---|
@@ -88,7 +88,7 @@ The system is specifically engineered for high-concurrency booking scenarios (su
 
 ---
 
-## 📚 Technical Architecture & Docs
+##  Technical Architecture & Docs
 
 For detailed design write-ups, see:
 - [`ARCHITECTURE.md`](file:///c:/Users/DELL/Desktop/ticket%20booking/ARCHITECTURE.md) — Concurrency protection, TTL worker, & waitlist algorithm design.
