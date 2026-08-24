@@ -1,0 +1,2106 @@
+# Ticket Booking System — Product Requirements Document (PRD)
+
+**Version:** 1.0  
+**Status:** Implementation Ready  
+**Product Type:** Web-based ticket booking platform  
+**Primary Domains:** Movies and Concerts  
+**User Roles:** Customer, Organiser, Admin
+
+---
+
+## 1. Product Overview
+
+The Ticket Booking System is a web platform for discovering and booking movie and concert tickets through a visual seat-selection experience.
+
+The system must support high-demand booking scenarios where multiple customers attempt to select the same seats simultaneously. It must temporarily hold selected seats, automatically release abandoned holds, prevent double booking, and provide a waitlist when an event or seat category is sold out.
+
+After a successful booking, the customer receives a digital ticket containing a QR code encoding the booking reference.
+
+The platform has three roles:
+
+- **Customer:** Browses events, selects seats, books tickets, joins waitlists, views booking history, and cancels bookings.
+- **Organiser:** Creates and manages movie/event listings and views booking and revenue information.
+- **Admin:** Creates and manages venues, seat layouts, seat categories, and platform-level configuration.
+
+The core requirements are based on the supplied project specification, including visual seat maps, configurable seat-hold TTL, concurrency protection, category-based waitlists, automatic seat offers, QR ticketing, email delivery, and organiser revenue summaries.
+
+---
+
+# 2. Problem Statement
+
+Traditional ticket booking systems face several problems:
+
+1. Popular events can sell out immediately.
+2. Seats selected during checkout may remain unavailable when customers abandon payment.
+3. Cancelled bookings may leave seats unused.
+4. Multiple customers may attempt to reserve the same seat at the same time.
+5. Customers need a clear real-time view of seat availability.
+6. Customers waiting for sold-out events need an automated and fair allocation mechanism.
+7. Confirmed bookings require a reliable digital ticket.
+
+The product solves these problems through temporary seat holds, concurrency-safe booking, real-time seat status, waitlists, automated seat reassignment, and QR-based digital tickets.
+
+---
+
+# 3. Product Vision
+
+Build a reliable and user-friendly ticket booking platform where customers can confidently select seats, complete bookings, and receive digital tickets while the platform efficiently handles high-demand events and cancelled-seat reallocation.
+
+---
+
+# 4. Product Goals
+
+## 4.1 Primary Goals
+
+- Allow customers to discover movies and concerts.
+- Allow customers to visually select seats.
+- Display seat status as available, held, or booked.
+- Temporarily hold selected seats during checkout.
+- Automatically release expired holds.
+- Prevent two customers from successfully holding or booking the same seat.
+- Support booking cancellation.
+- Support waitlists for sold-out seat categories.
+- Automatically offer cancelled seats to waitlisted customers.
+- Expire unaccepted waitlist offers and continue down the queue.
+- Generate QR-code tickets after successful booking.
+- Email confirmed tickets to customers.
+- Allow organisers to manage events and monitor bookings/revenue.
+- Allow admins to manage venues and seat configurations.
+
+## 4.2 Secondary Goals
+
+- Provide a clean and responsive user interface.
+- Make booking state understandable at every step.
+- Provide useful error messages.
+- Maintain a clear booking history.
+- Provide well-documented APIs and database structure.
+- Make the application deployable using common hosting platforms.
+
+---
+
+# 5. Non-Goals
+
+The following are outside the core MVP unless explicitly added later:
+
+- Complex dynamic pricing.
+- Multiple currencies.
+- International tax calculation.
+- Physical ticket printing.
+- Loyalty/rewards programs.
+- Subscription memberships.
+- Resale marketplace.
+- Seat recommendation based on AI.
+- Advanced payment settlement and financial reconciliation.
+- Native Android/iOS applications.
+- Social networking features.
+
+---
+
+# 6. Target Users
+
+## 6.1 Customer
+
+A person who wants to discover and book tickets for a movie or concert.
+
+### Customer Needs
+
+- Quickly find an event.
+- Know which seats are available.
+- Select preferred seats visually.
+- Avoid losing seats while paying.
+- Receive confirmation immediately.
+- Receive a digital ticket.
+- Join a waitlist when tickets are unavailable.
+- Track and cancel bookings.
+
+---
+
+## 6.2 Organiser
+
+An event or movie organiser responsible for creating listings and monitoring performance.
+
+### Organiser Needs
+
+- Create events.
+- Select venue.
+- Configure event date/time.
+- Configure category pricing.
+- View booking information.
+- Monitor revenue.
+- Understand event occupancy.
+
+---
+
+## 6.3 Admin
+
+The platform administrator.
+
+### Admin Needs
+
+- Create venues.
+- Configure venue seat layouts.
+- Define seat categories.
+- Manage platform-level configurations.
+- Maintain venue data.
+
+---
+
+# 7. Role-Based Access Control
+
+| Feature | Customer | Organiser | Admin |
+|---|---:|---:|---:|
+| Register/Login | Yes | Yes | Yes |
+| Browse Events | Yes | Yes | Yes |
+| View Seat Map | Yes | Yes | Yes |
+| Book Tickets | Yes | Optional | Optional |
+| View Own Bookings | Yes | No | No |
+| Cancel Own Booking | Yes | No | No |
+| Join Waitlist | Yes | No | No |
+| Create Event | No | Yes | Yes |
+| Manage Own Events | No | Yes | Yes |
+| View Event Revenue | No | Yes | Yes |
+| Create Venue | No | No | Yes |
+| Manage Seat Layout | No | No | Yes |
+| Manage Seat Categories | No | No | Yes |
+
+---
+
+# 8. Core User Journeys
+
+## 8.1 Customer Booking Journey
+
+1. Customer opens platform.
+2. Customer registers or logs in.
+3. Customer browses events.
+4. Customer filters/searches events.
+5. Customer opens an event.
+6. Customer selects show/date/time if applicable.
+7. System displays visual seat map.
+8. Customer selects one or more available seats.
+9. System attempts to create a temporary hold.
+10. If successful, selected seats become held.
+11. Other customers see the seats as unavailable.
+12. Customer proceeds to checkout.
+13. Customer confirms booking.
+14. System converts held seats into booked seats.
+15. System creates booking reference.
+16. System generates QR code containing the booking reference.
+17. System sends confirmation email.
+18. Booking appears in booking history.
+
+---
+
+# 9. Seat State Model
+
+Every seat for a show must have a current state.
+
+## 9.1 States
+
+### AVAILABLE
+
+Seat can be selected.
+
+### HELD
+
+Seat is temporarily reserved by a customer during checkout.
+
+A held seat must contain:
+
+- Customer/user ID.
+- Hold identifier.
+- Hold creation time.
+- Hold expiration time.
+
+### BOOKED
+
+Seat has been successfully booked.
+
+### EXPIRED
+
+A hold has expired and the seat must return to AVAILABLE.
+
+### CANCELLED
+
+A previously booked seat has been cancelled and becomes available for reallocation.
+
+---
+
+# 10. Seat Map Requirements
+
+The frontend must display a visual seat grid.
+
+Each seat should visually communicate:
+
+- Seat number.
+- Seat category.
+- Availability.
+- Selected state.
+- Held state.
+- Booked state.
+
+Suggested interaction:
+
+- Available → selectable.
+- Selected → highlighted.
+- Held by current customer → shown as selected/held.
+- Held by another customer → disabled.
+- Booked → disabled.
+
+The seat map must update when seat availability changes.
+
+---
+
+# 11. Seat Categories
+
+Venues must support categories such as:
+
+- Premium
+- Standard
+
+Additional categories may be supported.
+
+Each category must support:
+
+- Category name.
+- Price.
+- Seat mapping.
+- Availability count.
+
+Pricing is configured per event/show.
+
+---
+
+# 12. Seat Hold System
+
+## 12.1 Purpose
+
+The hold system prevents a customer from losing seats while completing checkout.
+
+## 12.2 Default TTL
+
+The system should support a configurable TTL.
+
+Example:
+
+**10 minutes**
+
+The actual TTL must be configurable rather than hardcoded.
+
+## 12.3 Hold Creation
+
+When a customer selects seats:
+
+1. Backend receives seat IDs.
+2. Backend verifies that each seat belongs to the requested show.
+3. Backend verifies that each seat is available.
+4. Backend attempts an atomic hold operation.
+5. If all requested seats can be held, the transaction succeeds.
+6. If any requested seat cannot be held, the operation fails safely.
+7. Held seats receive an expiration timestamp.
+
+## 12.4 Partial Hold Rule
+
+For a multi-seat request:
+
+> Either all requested seats are successfully held or none are held.
+
+This prevents partial reservations.
+
+## 12.5 Hold Expiration
+
+When TTL expires:
+
+1. System identifies expired holds.
+2. Held seats are released.
+3. Seat status changes to AVAILABLE.
+4. Real-time clients are informed of the update.
+
+---
+
+# 13. Concurrency Protection
+
+Concurrency is a critical system requirement.
+
+Two customers must never both successfully hold or book the same seat.
+
+## 13.1 Required Behavior
+
+If Customer A and Customer B attempt to hold Seat A1 simultaneously:
+
+- Only one request succeeds.
+- The other request receives a clear failure response.
+- The losing customer sees the seat as unavailable.
+
+## 13.2 Recommended Implementation
+
+Use database transactions and row-level locking or an equivalent atomic mechanism.
+
+Possible approaches:
+
+- Database transaction with `SELECT ... FOR UPDATE`.
+- Atomic conditional update.
+- Unique constraints.
+- Transaction isolation.
+- Distributed locking if required by architecture.
+
+The implementation must guarantee that concurrent requests cannot create two valid holds for the same show-seat combination.
+
+---
+
+# 14. Checkout
+
+The checkout page must display:
+
+- Event/movie name.
+- Venue.
+- Date.
+- Time.
+- Selected seats.
+- Seat categories.
+- Price per category.
+- Total price.
+- Hold expiration countdown.
+
+The countdown should update continuously.
+
+When the timer reaches zero:
+
+- Checkout should become invalid.
+- The customer must be informed that the seats were released.
+- The customer should be redirected to the seat map or offered a retry.
+
+---
+
+# 15. Booking Confirmation
+
+After successful checkout:
+
+1. Verify that the hold belongs to the customer.
+2. Verify that the hold has not expired.
+3. Convert held seats to BOOKED.
+4. Create booking record.
+5. Generate unique booking reference.
+6. Generate QR code.
+7. Trigger confirmation email.
+8. Return booking confirmation to frontend.
+
+The booking operation must be idempotent where appropriate to avoid duplicate bookings caused by repeated requests.
+
+---
+
+# 16. Booking Reference
+
+Each confirmed booking must have a unique reference.
+
+Example format:
+
+`TBS-2026-AB12CD`
+
+The exact format may be changed during implementation.
+
+The booking reference must be:
+
+- Unique.
+- Non-sensitive.
+- Suitable for QR encoding.
+- Searchable internally.
+
+---
+
+# 17. QR Ticket
+
+Every confirmed booking must generate a QR code.
+
+The QR code must encode the booking reference.
+
+The ticket should contain:
+
+- Customer name.
+- Event/movie.
+- Venue.
+- Date.
+- Time.
+- Seat numbers.
+- Seat category.
+- Booking reference.
+- QR code.
+
+---
+
+# 18. Email Notification
+
+After successful booking, the customer receives an email.
+
+The email should include:
+
+- Booking confirmation.
+- Event information.
+- Seat information.
+- Booking reference.
+- QR ticket.
+- Important instructions.
+
+The implementation may use any suitable free-tier email service.
+
+---
+
+# 19. Booking History
+
+Customers must be able to view:
+
+- Upcoming bookings.
+- Past bookings.
+- Cancelled bookings.
+
+Each booking should show:
+
+- Booking reference.
+- Event.
+- Venue.
+- Date/time.
+- Seats.
+- Amount.
+- Status.
+
+Possible booking statuses:
+
+- CONFIRMED
+- CANCELLED
+- EXPIRED
+
+---
+
+# 20. Booking Cancellation
+
+Customers can cancel eligible confirmed bookings.
+
+Cancellation flow:
+
+1. Customer opens booking.
+2. Customer selects Cancel.
+3. System validates cancellation eligibility.
+4. Booking becomes CANCELLED.
+5. Associated seats become available for allocation.
+6. Waitlist process is triggered if applicable.
+7. Customer receives cancellation confirmation.
+
+The exact cancellation policy can be configured later.
+
+---
+
+# 21. Waitlist
+
+The waitlist exists for sold-out events/categories.
+
+Customers join a waitlist for a specific seat category.
+
+Example:
+
+`Premium — Sold Out`
+
+Customer selects:
+
+**Join Premium Waitlist**
+
+The system stores the customer in queue order.
+
+---
+
+# 22. Waitlist Queue
+
+The waitlist must maintain FIFO ordering.
+
+Each entry should contain:
+
+- Waitlist ID.
+- Event/show ID.
+- Category ID.
+- Customer ID.
+- Queue position.
+- Created timestamp.
+- Status.
+
+Possible statuses:
+
+- WAITING
+- OFFERED
+- ACCEPTED
+- EXPIRED
+- REMOVED
+
+---
+
+# 23. Waitlist Assignment
+
+When a booked seat becomes available:
+
+1. System identifies the seat category.
+2. System checks the category waitlist.
+3. System selects the first eligible WAITING customer.
+4. System creates a time-limited offer.
+5. Customer receives notification.
+6. Seat is temporarily associated with the offer.
+7. Customer opens the offer link.
+8. Customer completes booking within the allowed period.
+
+---
+
+# 24. Waitlist Offer TTL
+
+The waitlist offer must have a configurable expiration period.
+
+Example:
+
+**5 minutes**
+
+The offer should contain:
+
+- Offer ID.
+- Customer ID.
+- Seat/show.
+- Expiration timestamp.
+- Secure token/link.
+- Status.
+
+---
+
+# 25. Expired Waitlist Offer
+
+If the customer does not complete the booking before the offer expires:
+
+1. Offer becomes EXPIRED.
+2. Seat becomes eligible for the next waitlisted customer.
+3. Next customer receives an offer.
+4. Process repeats until the seat is booked or no eligible waitlist entries remain.
+
+---
+
+# 26. Waitlist Fairness
+
+The system must preserve queue ordering.
+
+A later customer must not receive an offer before an earlier eligible customer unless the earlier customer:
+
+- Rejects the offer.
+- Lets it expire.
+- Is otherwise ineligible.
+
+---
+
+# 27. Event Management
+
+Organisers can create movie or concert listings.
+
+Required fields:
+
+- Event name.
+- Event type.
+- Description.
+- Venue.
+- Date.
+- Start time.
+- End time where applicable.
+- Seat category pricing.
+- Event image where applicable.
+- Status.
+
+Event types:
+
+- MOVIE
+- CONCERT
+
+Possible event statuses:
+
+- DRAFT
+- PUBLISHED
+- SOLD_OUT
+- CANCELLED
+- COMPLETED
+
+---
+
+# 28. Event Discovery
+
+Customers can:
+
+- Browse events.
+- Search by event name.
+- Filter by event type.
+- Filter by date.
+- Filter by venue.
+- Filter by category/price where applicable.
+- View event details.
+
+---
+
+# 29. Event Details Page
+
+The event details page should display:
+
+- Event title.
+- Event type.
+- Description.
+- Venue.
+- Date.
+- Time.
+- Available categories.
+- Pricing.
+- Availability.
+- Booking CTA.
+
+---
+
+# 30. Venue Management
+
+Admin can create venues.
+
+Venue fields:
+
+- Venue ID.
+- Name.
+- Address/location.
+- Capacity.
+- Seat layout.
+- Active/inactive status.
+
+A venue contains seat definitions.
+
+---
+
+# 31. Seat Definition
+
+Each venue seat should have:
+
+- Seat ID.
+- Row.
+- Seat number.
+- Category.
+- Position.
+- Display label.
+- Active/inactive status.
+
+Example:
+
+| Row | Seat | Category |
+|---|---|---|
+| A | 1 | Premium |
+| A | 2 | Premium |
+| A | 3 | Standard |
+
+---
+
+# 32. Show-Level Seat Inventory
+
+Seat availability must be stored per show/event occurrence.
+
+The same physical venue can host different shows.
+
+Therefore:
+
+**Venue Seat ≠ Show Seat Inventory**
+
+A show must have its own seat inventory derived from the venue layout.
+
+This allows Seat A1 to be booked for one show while remaining available for another show.
+
+---
+
+# 33. Organiser Dashboard
+
+The organiser dashboard should provide:
+
+### Event Metrics
+
+- Total events.
+- Published events.
+- Upcoming events.
+- Completed events.
+
+### Booking Metrics
+
+- Total bookings.
+- Tickets sold.
+- Occupancy percentage.
+- Cancelled bookings.
+
+### Revenue Metrics
+
+- Gross booking value.
+- Revenue by event.
+- Revenue by category.
+
+---
+
+# 34. Revenue Calculation
+
+For each booking:
+
+`Booking Total = Sum(ticket price for each booked seat)`
+
+Event revenue:
+
+`Event Revenue = Sum(valid confirmed booking totals)`
+
+Cancelled bookings must follow the configured cancellation/refund rules.
+
+If refunds are not implemented in MVP, cancellation should still update booking status and inventory correctly.
+
+---
+
+# 35. Authentication
+
+Users must be able to:
+
+- Register.
+- Login.
+- Logout.
+- Maintain authenticated sessions.
+- Access role-specific functionality.
+
+Required roles:
+
+- CUSTOMER
+- ORGANISER
+- ADMIN
+
+Passwords must never be stored in plaintext.
+
+Use secure password hashing.
+
+---
+
+# 36. Authorization
+
+Every protected backend endpoint must validate:
+
+1. Authentication.
+2. User role.
+3. Resource ownership where applicable.
+
+Example:
+
+An organiser must not be able to edit another organiser's event unless explicitly authorized.
+
+A customer must not be able to access another customer's booking.
+
+---
+
+# 37. API Requirements
+
+The backend should expose REST or equivalent APIs.
+
+## Authentication
+
+```text
+POST /api/auth/register
+POST /api/auth/login
+POST /api/auth/logout
+GET  /api/auth/me
+```
+
+## Events
+
+```text
+GET  /api/events
+GET  /api/events/:eventId
+POST /api/events
+PUT  /api/events/:eventId
+DELETE /api/events/:eventId
+```
+
+## Venues
+
+```text
+GET  /api/venues
+POST /api/venues
+GET  /api/venues/:venueId
+PUT  /api/venues/:venueId
+DELETE /api/venues/:venueId
+```
+
+## Seats
+
+```text
+GET /api/shows/:showId/seats
+POST /api/shows/:showId/holds
+DELETE /api/holds/:holdId
+```
+
+## Bookings
+
+```text
+POST /api/bookings
+GET  /api/bookings
+GET  /api/bookings/:bookingId
+POST /api/bookings/:bookingId/cancel
+```
+
+## Waitlist
+
+```text
+POST /api/shows/:showId/waitlist
+GET  /api/shows/:showId/waitlist
+DELETE /api/waitlist/:waitlistId
+POST /api/waitlist/offers/:offerId/accept
+```
+
+## Organiser Analytics
+
+```text
+GET /api/organiser/events/:eventId/summary
+GET /api/organiser/events/:eventId/revenue
+```
+
+The final API contract should be documented in the README/API documentation.
+
+---
+
+# 38. Real-Time Seat Updates
+
+Seat status changes should propagate to connected users.
+
+Examples:
+
+Customer A holds A1:
+
+```text
+A1: AVAILABLE → HELD
+```
+
+Customer A's hold expires:
+
+```text
+A1: HELD → AVAILABLE
+```
+
+Customer B books A1:
+
+```text
+A1: HELD → BOOKED
+```
+
+Recommended implementation options:
+
+- WebSockets.
+- Socket.IO.
+- Server-Sent Events where suitable.
+
+Polling can be used as a fallback, but true real-time updates are preferred.
+
+---
+
+# 39. Database Requirements
+
+The system should maintain normalized entities for:
+
+- Users.
+- Venues.
+- Venue seats.
+- Events.
+- Shows.
+- Show seats.
+- Seat categories.
+- Holds.
+- Hold items.
+- Bookings.
+- Booking items.
+- Waitlist entries.
+- Waitlist offers.
+- Notifications.
+
+---
+
+# 40. Recommended Core Data Model
+
+## User
+
+```text
+User
+- id
+- name
+- email
+- passwordHash
+- role
+- createdAt
+- updatedAt
+```
+
+## Venue
+
+```text
+Venue
+- id
+- name
+- address
+- capacity
+- status
+- createdAt
+```
+
+## VenueSeat
+
+```text
+VenueSeat
+- id
+- venueId
+- row
+- seatNumber
+- categoryId
+- positionX
+- positionY
+```
+
+## SeatCategory
+
+```text
+SeatCategory
+- id
+- name
+- description
+```
+
+## Event
+
+```text
+Event
+- id
+- organiserId
+- venueId
+- title
+- type
+- description
+- status
+- createdAt
+- updatedAt
+```
+
+## Show
+
+```text
+Show
+- id
+- eventId
+- startTime
+- endTime
+- createdAt
+```
+
+## ShowSeat
+
+```text
+ShowSeat
+- id
+- showId
+- venueSeatId
+- categoryId
+- price
+- status
+```
+
+## Hold
+
+```text
+Hold
+- id
+- userId
+- showId
+- expiresAt
+- status
+- createdAt
+```
+
+## HoldItem
+
+```text
+HoldItem
+- id
+- holdId
+- showSeatId
+```
+
+## Booking
+
+```text
+Booking
+- id
+- reference
+- userId
+- showId
+- totalAmount
+- status
+- createdAt
+- cancelledAt
+```
+
+## BookingItem
+
+```text
+BookingItem
+- id
+- bookingId
+- showSeatId
+- price
+```
+
+## WaitlistEntry
+
+```text
+WaitlistEntry
+- id
+- showId
+- categoryId
+- userId
+- status
+- createdAt
+```
+
+## WaitlistOffer
+
+```text
+WaitlistOffer
+- id
+- waitlistEntryId
+- showSeatId
+- expiresAt
+- status
+- token
+- createdAt
+```
+
+---
+
+# 41. Important Database Constraints
+
+The database must enforce data integrity.
+
+Important constraints include:
+
+- Unique user email.
+- Unique booking reference.
+- Unique `(showId, venueSeatId)` in show-seat inventory.
+- Valid foreign-key relationships.
+- Valid booking ownership.
+- Valid event/venue relationships.
+
+Seat concurrency must not rely only on frontend checks.
+
+---
+
+# 42. Seat Hold Transaction
+
+A recommended logical transaction:
+
+```text
+BEGIN TRANSACTION
+
+Lock requested show-seat rows
+
+Check all seats are AVAILABLE
+
+If any seat is unavailable:
+    ROLLBACK
+
+Otherwise:
+    Create Hold
+    Create HoldItems
+    Update seats to HELD
+    Set expiresAt
+
+COMMIT
+```
+
+This transaction must be atomic.
+
+---
+
+# 43. Booking Transaction
+
+```text
+BEGIN TRANSACTION
+
+Lock hold
+
+Verify hold belongs to current user
+
+Verify hold has not expired
+
+Verify seats are still held
+
+Create Booking
+
+Create BookingItems
+
+Update seats:
+    HELD → BOOKED
+
+Mark Hold as COMPLETED
+
+COMMIT
+```
+
+After commit:
+
+- Generate/send ticket.
+- Publish booking confirmation event.
+
+---
+
+# 44. Hold Expiration Worker
+
+A background scheduler should periodically find expired holds.
+
+Pseudo-flow:
+
+```text
+Find HELD records where expiresAt <= currentTime
+
+For each expired hold:
+    Start transaction
+    Lock hold
+    Re-check expiration/status
+    Release associated seats
+    Mark hold EXPIRED
+    Commit
+
+Publish seat availability update
+```
+
+The re-check is important because a customer may complete checkout while the scheduler is processing.
+
+---
+
+# 45. Waitlist Processing Worker
+
+When a seat becomes available:
+
+```text
+Find next WAITING customer
+Create WAITLIST OFFER
+Set offer expiration
+Notify customer
+```
+
+When an offer expires:
+
+```text
+Mark offer EXPIRED
+Return seat to allocation pool
+Find next WAITING customer
+Create new offer
+Notify next customer
+```
+
+---
+
+# 46. Idempotency
+
+Critical operations should support idempotency where needed.
+
+Examples:
+
+- Booking confirmation.
+- Payment/checkout submission.
+- Waitlist offer acceptance.
+- Cancellation.
+
+A repeated request must not create:
+
+- Two bookings.
+- Duplicate booking items.
+- Multiple successful allocations for the same seat.
+
+---
+
+# 47. Error Handling
+
+The API must return clear errors.
+
+Examples:
+
+### Seat already held
+
+```json
+{
+  "success": false,
+  "code": "SEAT_UNAVAILABLE",
+  "message": "One or more selected seats are no longer available."
+}
+```
+
+### Hold expired
+
+```json
+{
+  "success": false,
+  "code": "HOLD_EXPIRED",
+  "message": "Your seat hold has expired."
+}
+```
+
+### Unauthorized
+
+```json
+{
+  "success": false,
+  "code": "UNAUTHORIZED",
+  "message": "Authentication is required."
+}
+```
+
+### Forbidden
+
+```json
+{
+  "success": false,
+  "code": "FORBIDDEN",
+  "message": "You do not have permission to perform this action."
+}
+```
+
+---
+
+# 48. Frontend Requirements
+
+The frontend should contain at minimum:
+
+## Public
+
+- Landing page.
+- Event listing.
+- Event search/filter.
+- Event details.
+
+## Customer
+
+- Login.
+- Register.
+- Seat map.
+- Checkout.
+- Booking confirmation.
+- Booking history.
+- Booking details.
+- Waitlist status.
+
+## Organiser
+
+- Dashboard.
+- Event creation.
+- Event management.
+- Booking summary.
+- Revenue analytics.
+
+## Admin
+
+- Admin dashboard.
+- Venue management.
+- Seat layout management.
+- Category management.
+
+---
+
+# 49. Responsive Design
+
+The application must support:
+
+- Desktop.
+- Tablet.
+- Mobile.
+
+Seat selection is a critical UX and must remain usable on smaller screens.
+
+---
+
+# 50. Security Requirements
+
+The application must:
+
+- Hash passwords securely.
+- Validate all API input.
+- Sanitize user-controlled data where required.
+- Protect authenticated endpoints.
+- Enforce role-based authorization.
+- Prevent unauthorized booking access.
+- Use secure tokens for waitlist offers.
+- Avoid exposing sensitive internal identifiers unnecessarily.
+- Protect against SQL injection/ORM injection.
+- Protect against XSS.
+- Use secure cookies/token handling where applicable.
+- Apply rate limiting to authentication and sensitive endpoints.
+- Validate QR/booking references server-side.
+
+---
+
+# 51. Performance Requirements
+
+Target behavior:
+
+- Event listing should load quickly under normal traffic.
+- Seat map should render efficiently.
+- Seat status updates should propagate with minimal delay.
+- Booking operations should be transactionally safe.
+- Expired holds should be released promptly.
+- Waitlist processing should run automatically without manual intervention.
+
+Exact performance benchmarks can be established during load testing.
+
+---
+
+# 52. Observability
+
+The backend should log important system events:
+
+- Login failures.
+- Hold creation.
+- Hold expiration.
+- Booking creation.
+- Booking cancellation.
+- Waitlist offer creation.
+- Waitlist offer expiration.
+- Email failures.
+- Concurrency failures.
+
+Logs should include:
+
+- Timestamp.
+- Request/operation ID.
+- User ID where appropriate.
+- Event/show ID.
+- Relevant booking/hold/offer ID.
+- Error information.
+
+Sensitive data must not be logged unnecessarily.
+
+---
+
+# 53. Notifications
+
+Required notifications:
+
+### Booking Confirmation
+
+Triggered after successful booking.
+
+### Waitlist Offer
+
+Triggered when a seat is offered to a waitlisted customer.
+
+### Waitlist Offer Expiration
+
+Optional but recommended.
+
+### Cancellation Confirmation
+
+Triggered after successful cancellation.
+
+### Event Cancellation
+
+Recommended future capability.
+
+---
+
+# 54. Acceptance Criteria
+
+## Seat Selection
+
+- [ ] Customer can view a visual seat map.
+- [ ] Available seats can be selected.
+- [ ] Booked seats cannot be selected.
+- [ ] Seats held by another customer cannot be selected.
+- [ ] Seat category and price are visible.
+
+## Seat Hold
+
+- [ ] Selecting seats creates a temporary hold.
+- [ ] Hold TTL is configurable.
+- [ ] Held seats become unavailable to other customers.
+- [ ] Expired holds automatically release seats.
+- [ ] Seat map reflects released seats.
+
+## Concurrency
+
+- [ ] Two simultaneous hold attempts cannot both succeed for the same seat.
+- [ ] Database state remains consistent.
+- [ ] Failed requests receive an appropriate error.
+
+## Booking
+
+- [ ] Customer can complete a valid held-seat booking.
+- [ ] Held seats become BOOKED.
+- [ ] Booking reference is unique.
+- [ ] Booking appears in history.
+- [ ] Duplicate booking cannot be created by retrying the same operation.
+
+## QR Ticket
+
+- [ ] QR code is generated after confirmation.
+- [ ] QR code contains booking reference.
+- [ ] Ticket is delivered by email.
+
+## Waitlist
+
+- [ ] Customer can join a category waitlist.
+- [ ] Queue ordering is preserved.
+- [ ] Cancelled seats trigger waitlist processing.
+- [ ] First eligible customer receives an offer.
+- [ ] Offer has an expiration time.
+- [ ] Expired offer goes to the next customer.
+- [ ] Accepted offer can be converted into a booking.
+
+## Organiser
+
+- [ ] Organiser can create events.
+- [ ] Organiser can configure date/time.
+- [ ] Organiser can configure category pricing.
+- [ ] Organiser can view booking summary.
+- [ ] Organiser can view revenue.
+
+## Admin
+
+- [ ] Admin can create venues.
+- [ ] Admin can configure seat layouts.
+- [ ] Admin can configure seat categories.
+
+---
+
+# 55. Edge Cases
+
+The system must handle:
+
+1. Two users selecting the same seat simultaneously.
+2. User's hold expires while checkout is open.
+3. User submits checkout exactly when TTL expires.
+4. Scheduler processes an already-booked hold.
+5. Customer refreshes checkout page.
+6. Customer clicks booking confirmation multiple times.
+7. Customer loses network connection during checkout.
+8. Email service fails after booking succeeds.
+9. QR generation fails after booking succeeds.
+10. Customer tries to use an expired waitlist offer.
+11. Two processes attempt to allocate the same cancelled seat.
+12. Waitlist becomes empty.
+13. Customer attempts to join the same waitlist multiple times.
+14. Event is cancelled while seats are held.
+15. Venue seat is removed after events have been created.
+16. Organiser attempts to modify an event after bookings exist.
+17. Customer attempts to cancel an already cancelled booking.
+18. Hold-expiry worker runs multiple times for the same hold.
+
+---
+
+# 56. Business Rules
+
+1. A seat belongs to a venue.
+2. A show references a venue through its event.
+3. Each show has independent seat inventory.
+4. A seat can have only one active hold at a time.
+5. A seat can have only one confirmed booking at a time for a specific show.
+6. A hold expires automatically after its TTL.
+7. A booking can only be created from a valid active hold.
+8. Waitlists are maintained per show and seat category.
+9. Waitlist offers have expiration times.
+10. Expired offers move allocation to the next eligible customer.
+11. Booking references are unique.
+12. Customer booking history must only expose that customer's bookings.
+13. Organisers can access only authorized event information.
+14. Admins have venue and seat-layout management privileges.
+
+---
+
+# 57. MVP Scope
+
+The MVP must include:
+
+### Authentication
+
+- Customer registration/login.
+- Organiser login.
+- Admin login.
+- Role-based authorization.
+
+### Event Management
+
+- Event creation.
+- Event listing.
+- Event details.
+- Venue assignment.
+- Category pricing.
+
+### Venue
+
+- Venue creation.
+- Seat layout.
+- Seat categories.
+
+### Booking
+
+- Visual seat map.
+- Real-time seat status.
+- Seat holds.
+- Configurable TTL.
+- Automatic release.
+- Concurrency protection.
+- Booking confirmation.
+
+### Waitlist
+
+- Category-specific waitlist.
+- FIFO queue.
+- Automatic seat offer.
+- Offer TTL.
+- Next-customer fallback.
+
+### Ticket
+
+- Booking reference.
+- QR code.
+- Email delivery.
+
+### Customer
+
+- Booking history.
+- Booking cancellation.
+
+### Organiser
+
+- Booking summary.
+- Revenue summary.
+
+---
+
+# 58. Future Enhancements
+
+Potential future features:
+
+- Online payment gateway.
+- Refund processing.
+- Coupons.
+- Promotional pricing.
+- Dynamic pricing.
+- Multiple ticket types.
+- Food/add-on purchases.
+- Advanced organiser analytics.
+- Customer reviews.
+- Recommendations.
+- Notifications through SMS/WhatsApp.
+- Native mobile application.
+- Multi-language support.
+- Multi-currency support.
+- Ticket transfer.
+- Ticket resale.
+- QR scanning/check-in dashboard.
+
+---
+
+# 59. Recommended Technical Architecture
+
+A practical architecture can be:
+
+```text
+                ┌──────────────────────┐
+                │      Frontend        │
+                │ React / Next.js      │
+                └──────────┬───────────┘
+                           │
+                    REST / WebSocket
+                           │
+                ┌──────────▼───────────┐
+                │      Backend API     │
+                │ Node.js / Express    │
+                └───────┬───────┬──────┘
+                        │       │
+              ┌─────────▼─┐   ┌▼─────────────┐
+              │ Database  │   │ Background    │
+              │ PostgreSQL│   │ Jobs/Scheduler│
+              └───────────┘   └──────┬────────┘
+                                     │
+                         ┌───────────▼──────────┐
+                         │ Email + QR Services  │
+                         └──────────────────────┘
+```
+
+A Redis layer can optionally be introduced for:
+
+- Distributed locks.
+- Caching.
+- Pub/sub.
+- Background job queues.
+
+The exact technology choice is an implementation decision, but the architecture must satisfy the functional requirements.
+
+---
+
+# 60. Suggested Technology Stack
+
+## Frontend
+
+- React.js / Next.js
+- TypeScript
+- Tailwind CSS
+- Socket.IO client if WebSockets are used
+
+## Backend
+
+- Node.js
+- Express.js / NestJS
+- TypeScript
+
+## Database
+
+- PostgreSQL
+
+## ORM
+
+- Prisma or equivalent
+
+## Real-Time
+
+- Socket.IO/WebSockets
+
+## Background Jobs
+
+- Node scheduler for a simple deployment
+- BullMQ + Redis for a more scalable implementation
+
+## Email
+
+Any suitable free-tier email provider.
+
+## QR
+
+A standard QR-code generation library.
+
+## Deployment
+
+Possible platforms include:
+
+- Vercel
+- Render
+- Railway
+
+These deployment options are consistent with the supplied specification. fileciteturn0file0L40-L44
+
+---
+
+# 61. Development Phases
+
+## Phase 1 — Project Setup
+
+- [ ] Repository setup.
+- [ ] Frontend setup.
+- [ ] Backend setup.
+- [ ] Database setup.
+- [ ] Environment configuration.
+- [ ] Authentication foundation.
+
+## Phase 2 — Venue & Event Management
+
+- [ ] Venue CRUD.
+- [ ] Seat layout.
+- [ ] Seat categories.
+- [ ] Event CRUD.
+- [ ] Show creation.
+
+## Phase 3 — Customer Experience
+
+- [ ] Event browsing.
+- [ ] Event details.
+- [ ] Seat map.
+- [ ] Seat selection.
+- [ ] Checkout.
+
+## Phase 4 — Seat Hold Engine
+
+- [ ] Hold creation.
+- [ ] TTL.
+- [ ] Expiration worker.
+- [ ] Concurrency protection.
+- [ ] Real-time seat updates.
+
+## Phase 5 — Booking
+
+- [ ] Booking transaction.
+- [ ] Booking history.
+- [ ] Cancellation.
+- [ ] Booking reference.
+
+## Phase 6 — Ticketing
+
+- [ ] QR generation.
+- [ ] Ticket template.
+- [ ] Email delivery.
+
+## Phase 7 — Waitlist
+
+- [ ] Waitlist registration.
+- [ ] FIFO queue.
+- [ ] Automatic allocation.
+- [ ] Offer TTL.
+- [ ] Offer expiration.
+- [ ] Next-customer fallback.
+
+## Phase 8 — Analytics
+
+- [ ] Organiser dashboard.
+- [ ] Booking metrics.
+- [ ] Revenue metrics.
+
+## Phase 9 — Testing
+
+- [ ] Unit tests.
+- [ ] Integration tests.
+- [ ] API tests.
+- [ ] Concurrency tests.
+- [ ] Waitlist tests.
+- [ ] End-to-end tests.
+- [ ] Load testing.
+
+## Phase 10 — Deployment
+
+- [ ] Production database.
+- [ ] Environment variables.
+- [ ] Frontend deployment.
+- [ ] Backend deployment.
+- [ ] Email configuration.
+- [ ] Production testing.
+- [ ] README completion.
+
+---
+
+# 62. Testing Strategy
+
+## Unit Testing
+
+Test:
+
+- Seat availability logic.
+- Hold expiration logic.
+- Booking calculations.
+- Waitlist ordering.
+- Offer expiration.
+- Revenue calculations.
+
+## Integration Testing
+
+Test:
+
+- Auth → event access.
+- Seat hold → database.
+- Hold → booking.
+- Cancellation → waitlist.
+- Booking → QR/email.
+
+## Concurrency Testing
+
+Critical scenarios:
+
+```text
+100 users
+      ↓
+attempt to hold
+      ↓
+same seat
+      ↓
+exactly ONE succeeds
+```
+
+The remaining requests must fail safely.
+
+## End-to-End Testing
+
+Primary scenario:
+
+```text
+Register
+→ Login
+→ Browse event
+→ Select seats
+→ Hold seats
+→ Checkout
+→ Confirm
+→ Receive ticket
+→ View booking
+```
+
+Waitlist scenario:
+
+```text
+Sold out
+→ Join waitlist
+→ Existing booking cancelled
+→ Offer generated
+→ Customer accepts
+→ Booking created
+```
+
+---
+
+# 63. Success Metrics
+
+## Booking Reliability
+
+- Double-booking incidents: **0**
+- Invalid seat allocation incidents: **0**
+
+## Hold System
+
+- Expired holds automatically released.
+- Seat state remains consistent.
+
+## Waitlist
+
+- Cancelled eligible seats trigger automatic waitlist processing.
+- Queue ordering is preserved.
+- Expired offers are automatically reassigned.
+
+## Ticketing
+
+- Confirmed bookings generate QR tickets.
+- Confirmation emails are successfully delivered.
+
+## User Experience
+
+- Customers can complete a booking without manual support.
+- Seat status is understandable.
+- Checkout countdown is clear.
+
+---
+
+# 64. Definition of Done
+
+The product is considered complete when:
+
+- [ ] All MVP features are implemented.
+- [ ] Customer, organiser, and admin roles work.
+- [ ] Seat map works.
+- [ ] Seat holds work with configurable TTL.
+- [ ] Expired holds automatically release.
+- [ ] Concurrent booking attempts are safely handled.
+- [ ] Booking confirmation works.
+- [ ] QR ticket is generated.
+- [ ] Confirmation email is delivered.
+- [ ] Booking cancellation works.
+- [ ] Waitlist assignment works.
+- [ ] Waitlist offer TTL works.
+- [ ] Expired offers move to the next customer.
+- [ ] Organiser analytics work.
+- [ ] API documentation exists.
+- [ ] Database schema is documented.
+- [ ] Environment example exists.
+- [ ] README contains setup instructions.
+- [ ] Automated tests cover critical flows.
+- [ ] Application is deployed.
+- [ ] Hosted URL is available.
+
+The original deliverables explicitly require complete source code, a README containing setup/API/database/seat-hold/waitlist documentation, a hosted application URL, and a system-design write-up focused on TTL, concurrency, waitlist assignment, and offer handling. fileciteturn0file0L40-L47
+
+---
+
+# 65. Required Documentation
+
+The repository must contain:
+
+```text
+README.md
+.env.example
+API.md
+ARCHITECTURE.md
+DATABASE.md
+```
+
+README should include:
+
+- Project overview.
+- Features.
+- Tech stack.
+- Prerequisites.
+- Installation.
+- Environment variables.
+- Database setup.
+- Migration instructions.
+- Seed instructions.
+- Local development.
+- API documentation.
+- Testing.
+- Deployment.
+- Seat-hold explanation.
+- Concurrency explanation.
+- Waitlist explanation.
+
+---
+
+# 66. Environment Variables
+
+Example:
+
+```env
+DATABASE_URL=
+JWT_SECRET=
+APP_URL=
+API_URL=
+
+EMAIL_HOST=
+EMAIL_PORT=
+EMAIL_USER=
+EMAIL_PASSWORD=
+EMAIL_FROM=
+
+SEAT_HOLD_TTL_MINUTES=10
+WAITLIST_OFFER_TTL_MINUTES=5
+```
+
+Secrets must never be committed to source control.
+
+---
+
+# 67. Critical System Flows
+
+## Flow A — Successful Booking
+
+```text
+Customer
+   ↓
+Select Seats
+   ↓
+Validate Availability
+   ↓
+Atomic Hold
+   ↓
+Checkout
+   ↓
+Validate Hold
+   ↓
+Create Booking
+   ↓
+BOOKED
+   ↓
+Generate QR
+   ↓
+Send Email
+```
+
+## Flow B — Abandoned Checkout
+
+```text
+Customer
+   ↓
+Select Seats
+   ↓
+HOLD
+   ↓
+Customer Abandons
+   ↓
+TTL Expires
+   ↓
+Scheduler
+   ↓
+Release Seats
+   ↓
+AVAILABLE
+```
+
+## Flow C — Waitlist
+
+```text
+Seat Cancelled
+      ↓
+Check Category Waitlist
+      ↓
+Get First WAITING User
+      ↓
+Create Time-Limited Offer
+      ↓
+Send Notification
+      ↓
+ ┌────┴─────┐
+ ↓          ↓
+Accept     Expire
+ ↓          ↓
+BOOKED   Next User
+```
+
+---
+
+# 68. Key Product Risks
+
+## Risk 1 — Double Booking
+
+**Impact:** Critical
+
+**Mitigation:** Database transactions, row locking/atomic updates, constraints, and concurrency testing.
+
+## Risk 2 — Stale Seat Map
+
+**Impact:** High
+
+**Mitigation:** WebSockets/realtime updates plus server-side validation.
+
+## Risk 3 — Expired Holds Remaining Active
+
+**Impact:** High
+
+**Mitigation:** Background scheduler and database-level expiration checks.
+
+## Risk 4 — Waitlist Race Conditions
+
+**Impact:** Critical
+
+**Mitigation:** Transactional allocation and locking around seat/offer assignment.
+
+## Risk 5 — Email Failure
+
+**Impact:** Medium
+
+**Mitigation:** Store booking independently of email delivery and retry failed notifications.
+
+---
+
+# 69. Final Product Principle
+
+The frontend may improve the user experience, but **the backend/database is the final authority for seat availability**.
+
+Every critical operation must be validated server-side.
+
+The three most important technical guarantees are:
+
+1. **A seat cannot be successfully allocated to two customers for the same show.**
+2. **Expired holds automatically return seats to the available pool.**
+3. **Cancelled seats are automatically offered to waitlisted customers in queue order.**
+
+These areas align directly with the evaluation focus in the supplied specification. fileciteturn0file0L48-L54
+
+---
+
+# 70. Final Deliverable Checklist
+
+- [ ] Complete frontend source code.
+- [ ] Complete backend source code.
+- [ ] Database schema/migrations.
+- [ ] Authentication and RBAC.
+- [ ] Venue management.
+- [ ] Seat layout management.
+- [ ] Event/show management.
+- [ ] Visual seat map.
+- [ ] Real-time seat status.
+- [ ] Seat hold engine.
+- [ ] Configurable hold TTL.
+- [ ] Automatic hold release.
+- [ ] Concurrency protection.
+- [ ] Booking engine.
+- [ ] Cancellation.
+- [ ] Waitlist engine.
+- [ ] Waitlist offer TTL.
+- [ ] Automatic reassignment.
+- [ ] QR generation.
+- [ ] Email ticket.
+- [ ] Booking history.
+- [ ] Organiser dashboard.
+- [ ] Revenue summary.
+- [ ] Admin dashboard.
+- [ ] API documentation.
+- [ ] Database documentation.
+- [ ] Architecture documentation.
+- [ ] `.env.example`.
+- [ ] Automated tests.
+- [ ] README.
+- [ ] Hosted application.
+- [ ] System-design write-up.
